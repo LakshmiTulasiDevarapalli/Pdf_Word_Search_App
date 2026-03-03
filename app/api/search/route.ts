@@ -233,6 +233,25 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
     }
   }
 
+  // --- Special validation for the LOS keyword ---
+  // "los", "loss", "lose", "losing", "lost" etc. should match, but "losartan" should NOT.
+  if (keywordLower === "los") {
+    const afterKeyword = text.substring(matchIndex + keyword.length)
+    if (/^artan/i.test(afterKeyword)) {
+      return false
+    }
+  }
+
+  // --- Special validation for the BRUIS keyword ---
+  // "bruis", "bruise", "bruised", "bruising" etc. should match,
+  // but "no bruising", "no bruise", "no easy bruising", "no easy bruise" etc. should NOT.
+  if (keywordLower === "bruis") {
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 20), matchIndex)
+    if (/no\s+$/i.test(textBeforeMatch) || /no\s+easy\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+  }
+
   // --- Additional validation for colon-based keywords like "1:1" ---
   // Reject if the character AFTER the keyword is a digit (e.g., "1:1" matching start of "1:15")
   if (/^\d+:\d+$/.test(keywordLower)) {
