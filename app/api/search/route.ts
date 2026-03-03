@@ -224,6 +224,15 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
     }
   }
 
+  // --- Special validation for the PACK keyword ---
+  // "pack", "packs", "packing" etc. should match, but "ice pack", "ice packs", "ice packing" etc. should NOT.
+  if (keywordLower === "pack") {
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 10), matchIndex)
+    if (/ice\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+  }
+
   // --- Additional validation for colon-based keywords like "1:1" ---
   // Reject if the character AFTER the keyword is a digit (e.g., "1:1" matching start of "1:15")
   if (/^\d+:\d+$/.test(keywordLower)) {
