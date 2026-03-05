@@ -99,6 +99,18 @@ function searchPDFWithSpec(text: string, keywords: string[], numPages: number): 
       const occurrences = findAllOccurrences(paragraphLower, keywordLower)
 
       if (occurrences.length > 0) {
+        // --- Paragraph-level exclusion for the CONCERN keyword ---
+        // Skip paragraphs that contain "questions regarding any part of the document"
+        // or "no behavioral concern observed during the shift"
+        if (keywordLower === "concern") {
+          if (
+            paragraphLower.includes("questions regarding any part of the document") ||
+            paragraphLower.includes("no behavioral concern observed during the shift")
+          ) {
+            continue
+          }
+        }
+
         const dedupedOccurrences = deduplicateOccurrencesByDistance(occurrences, 200)
 
         console.log(
@@ -234,10 +246,15 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
   }
 
   // --- Special validation for the LOS keyword ---
-  // "los", "loss", "lose", "losing", "lost" etc. should match, but "losartan" should NOT.
+  // "los", "loss", "lose", "losing", "lost" etc. should match, but "losartan" and "weight loss" should NOT.
   if (keywordLower === "los") {
     const afterKeyword = text.substring(matchIndex + keyword.length)
     if (/^artan/i.test(afterKeyword)) {
+      return false
+    }
+    // Exclude "weight loss", "weight lose", "weight losing" etc.
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 15), matchIndex)
+    if (/weight\s+$/i.test(textBeforeMatch)) {
       return false
     }
   }
@@ -248,6 +265,26 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
   if (keywordLower === "bruis") {
     const textBeforeMatch = text.substring(Math.max(0, matchIndex - 20), matchIndex)
     if (/no\s+$/i.test(textBeforeMatch) || /no\s+easy\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+  }
+
+  // --- Special validation for the DISCOLOR keyword ---
+  // "discolor", "discolored", "discoloration" etc. should match,
+  // but "no skin discoloration", "no skin discolored" etc. should NOT.
+  if (keywordLower === "discolor") {
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 25), matchIndex)
+    if (/no\s+skin\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+  }
+
+  // --- Special validation for the SMOK keyword ---
+  // "smok", "smoke", "smoking", "smoked" etc. should match,
+  // but "never smok", "never smoke", "never smoking", "never smoked" etc. should NOT.
+  if (keywordLower === "smok") {
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 15), matchIndex)
+    if (/never\s+$/i.test(textBeforeMatch)) {
       return false
     }
   }
