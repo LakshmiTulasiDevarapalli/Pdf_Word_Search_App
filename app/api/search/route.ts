@@ -378,29 +378,58 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
   }
 
   // --- Additional validation for colon-based keywords like "1:1" ---
-  // Reject time formats like "01:13", "15:25", "11:15" etc.
-  // Only match standalone "1:1" patterns (one-to-one monitoring)
-  if (/^\d+:\d+$/.test(keywordLower)) {
+  // For "1:1" keyword specifically, we need strict validation:
+  // - ONLY match actual "1:1" one-to-one monitoring references
+  // - REJECT any time format like "01:13", "1:15", "15:25", "11:15" etc.
+  if (keywordLower === "1:1") {
     const charBefore = matchIndex > 0 ? text[matchIndex - 1] : ""
     const charAfter = matchIndex + keyword.length < text.length ? text[matchIndex + keyword.length] : ""
 
-    // Reject if the character BEFORE is a digit (e.g., "01:13" where "1:1" appears after "0")
+    // Reject if the character BEFORE is a digit (e.g., "01:13" contains "1:1" after "0")
     if (/\d/.test(charBefore)) {
       return false
     }
 
-    // Reject if the character AFTER the keyword is a digit (e.g., "1:15" where "1:1" appears at start)
+    // Reject if the character AFTER the keyword is a digit (e.g., "1:15" starts with "1:1")
     if (/\d/.test(charAfter)) {
       return false
     }
 
-    // Additionally, check if this looks like a time format (HH:MM pattern)
-    // Look at broader context to detect time patterns like "01:13", "15:25"
-    const contextBefore = text.substring(Math.max(0, matchIndex - 5), matchIndex)
-    const contextAfter = text.substring(matchIndex + keyword.length, matchIndex + keyword.length + 5)
+    // Check broader context for time patterns (HH:MM format)
+    // Get surrounding text and look for time-like patterns
+    const contextStart = Math.max(0, matchIndex - 10)
+    const contextEnd = Math.min(text.length, matchIndex + keyword.length + 10)
+    const surroundingText = text.substring(contextStart, contextEnd)
     
-    // If surrounded by digits that form a time pattern, reject
-    if (/\d{1,2}$/.test(contextBefore) || /^\d{1,2}/.test(contextAfter)) {
+    // Detect common time patterns in the surrounding context
+    // Time patterns: "01:13", "1:30", "15:25", "12:00", "11:15" etc.
+    // These are typically HH:MM or H:MM format where both parts are 1-2 digits
+    const timePatterns = [
+      /\d{1,2}:\d{2}/,  // Standard time HH:MM or H:MM
+      /\d{2}:\d{1,2}/, // Two digit hour with any minute
+    ]
+    
+    for (const pattern of timePatterns) {
+      const match = surroundingText.match(pattern)
+      if (match) {
+        // Check if the matched time pattern overlaps with our keyword position
+        const matchStartInContext = surroundingText.indexOf(match[0])
+        const matchEndInContext = matchStartInContext + match[0].length
+        const keywordStartInContext = matchIndex - contextStart
+        const keywordEndInContext = keywordStartInContext + keyword.length
+        
+        // If there's overlap between the time pattern and our keyword, reject
+        if (keywordStartInContext < matchEndInContext && keywordEndInContext > matchStartInContext) {
+          return false
+        }
+      }
+    }
+  } else if (/^\d+:\d+$/.test(keywordLower)) {
+    // For other numeric colon patterns (not "1:1"), apply general digit checks
+    const charBefore = matchIndex > 0 ? text[matchIndex - 1] : ""
+    const charAfter = matchIndex + keyword.length < text.length ? text[matchIndex + keyword.length] : ""
+
+    if (/\d/.test(charBefore) || /\d/.test(charAfter)) {
       return false
     }
   }
