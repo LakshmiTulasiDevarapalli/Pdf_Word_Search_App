@@ -121,8 +121,12 @@ export async function POST(request: NextRequest) {
         )
 
         const totalKeywordOccurrences = keywordResults.reduce((count, result) => {
-          const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi")
-          const matches = result.paragraph.match(regex)
+          const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+          // For "1:1": require that it is NOT followed by a digit (avoids HH:MM like 01:13, 1:15)
+          const pattern = keyword === "1:1"
+            ? new RegExp(`(?<![0-9])${escaped}(?![0-9])`, "gi")
+            : new RegExp(escaped, "gi")
+          const matches = result.paragraph.match(pattern)
           return count + (matches ? matches.length : 0)
         }, 0)
 
@@ -219,12 +223,19 @@ export async function POST(request: NextRequest) {
 
         keywordResults.forEach((result, idx) => {
           const textRuns: TextRun[] = []
-          const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi")
-          const parts = result.paragraph.split(regex)
+          const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+          // For "1:1": use lookahead/lookbehind to avoid matching inside time formats like 01:13
+          const splitPattern = keyword === "1:1"
+            ? new RegExp(`((?<![0-9])${escaped}(?![0-9]))`, "gi")
+            : new RegExp(`(${escaped})`, "gi")
+          const parts = result.paragraph.split(splitPattern)
 
           parts.forEach((part) => {
             if (part) {
-              const isMatch = new RegExp(`^${keyword}$`, "i").test(part)
+              const matchPattern = keyword === "1:1"
+                ? new RegExp(`^(?<![0-9])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![0-9])$`, "i")
+                : new RegExp(`^${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")
+              const isMatch = matchPattern.test(part)
               textRuns.push(
                 new TextRun({
                   text: part,
