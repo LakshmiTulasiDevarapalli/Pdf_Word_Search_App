@@ -237,6 +237,16 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
     }
   }
 
+  // --- Special validation for "1:1" keyword ---
+  // Reject if the character AFTER "1:1" is a digit, meaning it's part of a time format like "1:13" or "01:13"
+  // Valid: "1:1 monitoring", "on 1:1." — Invalid: "01:13", "1:15"
+  if (keywordLower === "1:1") {
+    const charAfter = text[matchIndex + keyword.length]
+    if (charAfter !== undefined && /[0-9]/.test(charAfter)) {
+      return false
+    }
+  }
+
   // --- Special validation for the FIND keyword ---
   // "find", "finding", "finds" etc. should match, but "findings" should NOT.
   if (keywordLower === "find") {
