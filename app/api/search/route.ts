@@ -378,11 +378,29 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
   }
 
   // --- Additional validation for colon-based keywords like "1:1" ---
-  // Reject if the character AFTER the keyword is a digit (e.g., "1:1" matching start of "1:15")
+  // Reject time formats like "01:13", "15:25", "11:15" etc.
+  // Only match standalone "1:1" patterns (one-to-one monitoring)
   if (/^\d+:\d+$/.test(keywordLower)) {
+    const charBefore = matchIndex > 0 ? text[matchIndex - 1] : ""
     const charAfter = matchIndex + keyword.length < text.length ? text[matchIndex + keyword.length] : ""
 
+    // Reject if the character BEFORE is a digit (e.g., "01:13" where "1:1" appears after "0")
+    if (/\d/.test(charBefore)) {
+      return false
+    }
+
+    // Reject if the character AFTER the keyword is a digit (e.g., "1:15" where "1:1" appears at start)
     if (/\d/.test(charAfter)) {
+      return false
+    }
+
+    // Additionally, check if this looks like a time format (HH:MM pattern)
+    // Look at broader context to detect time patterns like "01:13", "15:25"
+    const contextBefore = text.substring(Math.max(0, matchIndex - 5), matchIndex)
+    const contextAfter = text.substring(matchIndex + keyword.length, matchIndex + keyword.length + 5)
+    
+    // If surrounded by digits that form a time pattern, reject
+    if (/\d{1,2}$/.test(contextBefore) || /^\d{1,2}/.test(contextAfter)) {
       return false
     }
   }
