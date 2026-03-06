@@ -100,12 +100,22 @@ function searchPDFWithSpec(text: string, keywords: string[], numPages: number): 
 
       if (occurrences.length > 0) {
         // --- Paragraph-level exclusion for the CONCERN keyword ---
-        // Skip paragraphs that contain "questions regarding any part of the document"
-        // or "no behavioral concern observed during the shift"
+        // Skip paragraphs that contain specific phrases:
+        // - "questions regarding any part of the document" / "questions concerning any part of the document"
+        // - "no behavioral concern observed during the shift" (singular/plural)
+        // - "denies any new concern"
+        // - "no concern"
+        // - "no behavioral concerns" (standalone)
         if (keywordLower === "concern") {
           if (
             paragraphLower.includes("questions regarding any part of the document") ||
-            paragraphLower.includes("no behavioral concern observed during the shift")
+            paragraphLower.includes("has questions concerning any part of the document") ||
+            paragraphLower.includes("no behavioral concern observed during the shift") ||
+            paragraphLower.includes("no behavioral concerns observed during the shift") ||
+            paragraphLower.includes("no behavioral concern(s) observed during the shift") ||
+            paragraphLower.includes("denies any new concern") ||
+            /\bno\s+concern\b/i.test(paragraphLower) ||
+            /\bno\s+behavioral\s+concerns?\b/i.test(paragraphLower)
           ) {
             continue
           }
@@ -246,25 +256,28 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
   }
 
   // --- Special validation for the LOS keyword ---
-  // "los", "loss", "lose", "losing", "lost" etc. should match, but "losartan" and "weight loss" should NOT.
+  // "los", "loss", "lose", "losing", "lost" etc. should match, but "losartan", "weight loss", and "air loss" should NOT.
   if (keywordLower === "los") {
     const afterKeyword = text.substring(matchIndex + keyword.length)
     if (/^artan/i.test(afterKeyword)) {
       return false
     }
-    // Exclude "weight loss", "weight lose", "weight losing" etc.
+    // Exclude "weight loss", "weight lose", "weight losing", "air loss" etc.
     const textBeforeMatch = text.substring(Math.max(0, matchIndex - 15), matchIndex)
-    if (/weight\s+$/i.test(textBeforeMatch)) {
+    if (/weight\s+$/i.test(textBeforeMatch) || /air\s+$/i.test(textBeforeMatch)) {
       return false
     }
   }
 
   // --- Special validation for the BRUIS keyword ---
   // "bruis", "bruise", "bruised", "bruising" etc. should match,
-  // but "no bruising", "no bruise", "no easy bruising", "no easy bruise" etc. should NOT.
+  // but "no bruising", "no bruise", "no easy bruising", "no easy bruise", "monitor for bleeding or bruising" etc. should NOT.
   if (keywordLower === "bruis") {
-    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 20), matchIndex)
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 35), matchIndex)
     if (/no\s+$/i.test(textBeforeMatch) || /no\s+easy\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+    if (/monitor\s+for\s+bleeding\s+or\s+$/i.test(textBeforeMatch)) {
       return false
     }
   }
@@ -282,9 +295,84 @@ function isValidKeywordMatch(text: string, keyword: string, matchIndex: number):
   // --- Special validation for the SMOK keyword ---
   // "smok", "smoke", "smoking", "smoked" etc. should match,
   // but "never smok", "never smoke", "never smoking", "never smoked" etc. should NOT.
+  // Also exclude "non-smoker within the past 30 days" and "Former remote smoker"
   if (keywordLower === "smok") {
-    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 15), matchIndex)
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 40), matchIndex)
     if (/never\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+    if (/non-$/i.test(textBeforeMatch) || /non\s*$/i.test(textBeforeMatch)) {
+      return false
+    }
+    if (/former\s+remote\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+  }
+
+  // --- Special validation for the SWEL keyword ---
+  // "swel", "swell", "swelling", "swelled" etc. should match,
+  // but "no swelling", "no swell" etc. should NOT.
+  if (keywordLower === "swel") {
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 15), matchIndex)
+    if (/no\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+  }
+
+  // --- Special validation for the LEAVE keyword ---
+  // "leave", "leaving", "leaves" etc. should match,
+  // but "Return from Leave", "leave open to air", "Leave open" etc. should NOT.
+  if (keywordLower === "leave") {
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 20), matchIndex)
+    const afterKeyword = text.substring(matchIndex + keyword.length, matchIndex + keyword.length + 20)
+    if (/return\s+from\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+    if (/^\s+open/i.test(afterKeyword)) {
+      return false
+    }
+  }
+
+  // --- Special validation for the PACK keyword (additional rules) ---
+  // Exclude "packed" and "packet" as well
+  if (keywordLower === "pack") {
+    const afterKeyword = text.substring(matchIndex + keyword.length)
+    if (/^ed\b/i.test(afterKeyword) || /^et/i.test(afterKeyword)) {
+      return false
+    }
+  }
+
+  // --- Special validation for the ABUSE keyword ---
+  // "abuse", "abused", "abusing", "abusive" etc. should match,
+  // but specific medical phrases should NOT:
+  // "Alcohol abuse with intoxication", "Prior polysubstance abuse", "Other psychoactive substance abuse",
+  // "Abuse :", "Abuse/Neglect :", "abuse," and "abuse ," should NOT match.
+  if (keywordLower === "abuse") {
+    const textBeforeMatch = text.substring(Math.max(0, matchIndex - 40), matchIndex)
+    const afterKeyword = text.substring(matchIndex + keyword.length, matchIndex + keyword.length + 30)
+    
+    // Exclude "Alcohol abuse with intoxication"
+    if (/alcohol\s+$/i.test(textBeforeMatch) && /^\s+with\s+intoxication/i.test(afterKeyword)) {
+      return false
+    }
+    // Exclude "Prior polysubstance abuse"
+    if (/prior\s+polysubstance\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+    // Exclude "Other psychoactive substance abuse"
+    if (/other\s+psychoactive\s+substance\s+$/i.test(textBeforeMatch)) {
+      return false
+    }
+    // Exclude "Abuse :" or "Abuse:" patterns (standalone labels)
+    if (/^\s*:/i.test(afterKeyword)) {
+      return false
+    }
+    // Exclude "Abuse/Neglect :" or "Abuse/Neglect:" patterns
+    if (/^\/neglect\s*:/i.test(afterKeyword)) {
+      return false
+    }
+    // Exclude "abuse," or "abuse ," (trailing comma pattern)
+    if (/^[\s]*,/i.test(afterKeyword)) {
       return false
     }
   }
