@@ -113,6 +113,7 @@ function searchPDFWithSpec(text: string, keywords: string[], numPages: number): 
             paragraphLower.includes("no behavioral concern observed during the shift") ||
             paragraphLower.includes("no behavioral concerns observed during the shift") ||
             paragraphLower.includes("no behavioral concern(s) observed during the shift") ||
+            paragraphLower.includes("for any question or concern call") ||
             paragraphLower.includes("denies any new concern") ||
             /\bno\s+concern\b/i.test(paragraphLower) ||
             /\bno\s+behavioral\s+concerns?\b/i.test(paragraphLower)
