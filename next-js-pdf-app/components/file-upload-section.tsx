@@ -19,7 +19,6 @@ const DEFAULT_KEYWORDS = [
   "ALTERCATION",
   "CONCERN",
   "CONFLICT",
-  "ERROR",
   "SUICIDE",
   "1:1",
   "15 MIN",
@@ -35,7 +34,6 @@ const DEFAULT_KEYWORDS = [
   "SWEL",
   "SWOLL",
   "DISCOLOR",
-  "CODE",
   "SEX",
   "FOOD",
   "LOS",
@@ -50,6 +48,8 @@ const DEFAULT_KEYWORDS = [
   "DENTURE",
   "SMOK",
   "NARCAN",
+  "ERROR",
+  "CODE",
   "CHANGE",
 ]
 
